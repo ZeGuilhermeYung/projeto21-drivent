@@ -11,7 +11,7 @@ export type RequestError = {
   message: string;
 };
 
-export type AddressInfo = {
+export type AddressEnrollment = {
   logradouro: string;
   complemento: string;
   bairro: string;
