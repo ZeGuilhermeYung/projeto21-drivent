@@ -1,41 +1,38 @@
-import { Ticket, TicketStatus } from '@prisma/client';
-import { ticketsRepository } from '@/repositories/tickets-repository';
-import { conflictError, invalidDataError, notFoundError } from '@/errors';
-import { enrollmentRepository } from '@/repositories';
-import { CreateTicketInfo } from '@/protocols';
+import { notFoundError } from '@/errors';
+import { CreateTicketParams } from '@/protocols';
+import { enrollmentRepository, ticketsRepository } from '@/repositories';
 
-async function createTicket(userId: number, ticketTypeId: number) {
-  if (!ticketTypeId) throw invalidDataError('Não existe este ticket no banco!');
+async function getTicketTypes() {
+  const ticketTypes = await ticketsRepository.findTicketTypes();
+  return ticketTypes;
+}
 
-  const usersEnrollmentInfo = await enrollmentRepository.findWithAddressByUserId(userId);
+async function getTicketByUserId(userId: number) {
+  const enrollment = await enrollmentRepository.findWithAddressByUserId(userId);
+  if (!enrollment) throw notFoundError();
 
-  if (!usersEnrollmentInfo) throw notFoundError();
-
-  const ticketInfo: CreateTicketInfo = {
-    enrollmentId: usersEnrollmentInfo.id,
-    ticketTypeId,
-    status: TicketStatus.RESERVED,
-  };
-  const enrollmentExists = await ticketsRepository.findTicketByEnrollmentId(usersEnrollmentInfo.id);
-
-  if (enrollmentExists) throw conflictError('Já existe um ticket associado a este no banco!');
-
-  const ticket = await ticketsRepository.createTicket(ticketInfo);
+  const ticket = await ticketsRepository.findTicketByEnrollmentId(enrollment.id);
+  if (!ticket) throw notFoundError();
 
   return ticket;
 }
 
-async function getUserCurrentTicket(userId: number): Promise<Ticket> {
-  const usersEnrollmentInfo = await ticketsRepository.findUserById(userId);
+async function createTicket(userId: number, ticketTypeId: number) {
+  const enrollment = await enrollmentRepository.findWithAddressByUserId(userId);
+  if (!enrollment) throw notFoundError();
 
-  if (usersEnrollmentInfo === null) throw notFoundError();
+  const ticketData: CreateTicketParams = {
+    ticketTypeId,
+    enrollmentId: enrollment.id,
+    status: 'RESERVED',
+  };
 
-  const enrollmentId: number = usersEnrollmentInfo.id;
-  const userCurrentTicket = await ticketsRepository.findTicketByEnrollmentId(enrollmentId);
-
-  if (userCurrentTicket === null) throw notFoundError();
-
-  return userCurrentTicket;
+  const ticket = await ticketsRepository.createTicket(ticketData);
+  return ticket;
 }
 
-export const ticketsService = { createTicket, getUserCurrentTicket };
+export const ticketsService = {
+  getTicketByUserId,
+  getTicketTypes,
+  createTicket,
+};
